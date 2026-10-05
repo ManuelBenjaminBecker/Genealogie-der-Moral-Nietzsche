@@ -30,9 +30,7 @@ const missions = [
 function loadStats() {
   try {
     const value = localStorage.getItem(STATS_KEY);
-    if (!value) {
-      return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
-    }
+    if (!value) return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
     const parsed = JSON.parse(value);
     return {
       games: Number(parsed.games) || 0,
@@ -108,16 +106,16 @@ function statsCardMarkup() {
       <div class="stats-grid">
         <div class="stat"><strong>${games}</strong><span>Spiele</span></div>
         <div class="stat"><strong>${avg}%</strong><span>Durchschnitt</span></div>
-        <div class="stat"><strong>${agentFound}</strong><span>Agent gefunden</span></div>
-        <div class="stat"><strong>${agentEscaped}</strong><span>Agent entkommen</span></div>
+        <div class="stat"><strong>${agentFound}</strong><span>Agent</span></div>
+        <div class="stat"><strong>${agentEscaped}</strong><span>Escape</span></div>
       </div>
       <div class="history-list">
-        ${history.length ? history.slice(0, 3).map(item => `
+        ${history.length ? history.slice(0, 3).map((item) => `
           <div class="history-item">
-            <span>${item.caught ? '✅ Agent gefasst' : '⚠️ Agent entkommen'}</span>
-            <small>${item.score}/${missions.length} Punkte</small>
+            <span>${item.caught ? '✅ erkannt' : '⚠️ entkommen'}</span>
+            <small>${item.score}/${missions.length}</small>
           </div>
-        `).join('') : '<div class="history-item empty"><span>Keine bisherigen Spiele.</span></div>'}
+        `).join('') : '<div class="history-item empty"><span>Keine Spiele bisher.</span></div>'}
       </div>
     </div>
   `;
@@ -131,25 +129,15 @@ function home() {
   view(`
     <section class="panel hero home-panel">
       ${logoMarkup()}
-      <p class="quote">Nicht nur fragen: „Was ist gut?“, sondern: Wie wurden unsere Werte zu Werten?</p>
-      <div class="grid home-grid">
-        <div class="card">
-          <b>1 iPad · 6 Personen</b>
-          <p class="small">Pass-and-play. Rollen bleiben geheim. Keine Anmeldung, keine Datenübertragung.</p>
-        </div>
-        <div class="card">
-          <b>ca. 45–60 Minuten</b>
-          <p class="small">Rollen, vier Akten, Notfallkonferenz, Sicherung und Auswertung.</p>
-        </div>
+      <div class="home-tagline">Mission für 6 · 4 Akten · 1 Agent</div>
+      <div class="home-meta">
+        <span>1 iPad</span>
+        <span>6 Spieler</span>
+        <span>Offline</span>
       </div>
       <div class="action-stack">
         <button onclick="setup()">Mission starten</button>
-        <button class="secondary" onclick="teacher()">Lehrkraft-Modus</button>
-      </div>
-      <div class="info-row">
-        <div class="pill">Offline-fähig</div>
-        <div class="pill">Keine Cookies</div>
-        <div class="pill">Keine externen Bibliotheken</div>
+        <button class="secondary" onclick="teacher()">Lehrer</button>
       </div>
       ${statsCardMarkup()}
     </section>
@@ -162,7 +150,7 @@ function setup() {
     <section class="panel setup-panel">
       <div class="eyebrow">Crew registrieren</div>
       <h2>Sechs Codenamen</h2>
-      <p>Ein iPad wandert gleich verdeckt durch die Gruppe. Jede Person sieht nur die eigene Rollenkarte.</p>
+      <p>Ein iPad wandert verdeckt durch die Gruppe.</p>
       ${S.names.map((n, i) => `
         <input class="nameinput" aria-label="Name ${i + 1}" value="${n}" oninput="S.names[${i}] = this.value; saveState();">
       `).join('')}
@@ -194,7 +182,7 @@ function passCard() {
     <section class="panel hero pass-panel">
       <div class="eyebrow">Geheime Übergabe ${S.show + 1}/6</div>
       <h2>iPad an <span>${esc(currentName)}</span></h2>
-      <p>Alle anderen schauen weg. Tippe erst dann auf „Rolle anzeigen“.</p>
+      <p>Alle anderen schauen weg.</p>
       <button onclick="revealRole()">Rolle anzeigen</button>
     </section>
   `);
@@ -213,22 +201,19 @@ function revealRole() {
       </div>
       <div class="bigrole ${isAgent ? 'bad' : ''}">${S.roles[currentIndex]}</div>
       ${isAgent ? `
-        <p><b>Geheimauftrag:</b> Bringe die Gruppe bei mindestens zwei Akten zu einer plausibel klingenden, aber unhistorischen oder vorschnellen Antwort. Du darfst argumentieren, aber keine Regeln brechen und keine falschen Zitate erfinden.</p>
+        <p><b>Geheimauftrag:</b> Bring die Gruppe bei mindestens zwei Akten zu einer vorschnellen oder unhistorischen Antwort.</p>
       ` : `
-        <p><b>Auftrag:</b> Rekonstruiert Nietzsches Argumente sauber. Achtet auf historische Entstehung, Perspektive und den Unterschied zwischen Beschreibung und Zustimmung.</p>
+        <p><b>Auftrag:</b> Rekonstruiert die Argumente sauber und achtet auf Genese und Geltung.</p>
       `}
-      <button onclick="nextRole()">Rolle verbergen & weiter</button>
+      <button onclick="nextRole()">Weiter</button>
     </section>
   `);
 }
 
 function nextRole() {
   S.show += 1;
-  if (S.show < 6) {
-    passCard();
-  } else {
-    briefing();
-  }
+  if (S.show < 6) passCard();
+  else briefing();
   saveState();
 }
 
@@ -237,11 +222,10 @@ function briefing() {
     <section class="panel briefing-panel">
       <div class="eyebrow">Briefing</div>
       <h2>Die Moralstation ist infiltriert.</h2>
-      <p>Bearbeitet vier Akten. Diskutiert jeweils <b>maximal 4 Minuten</b>. Eine Person bedient das iPad, alle müssen mindestens einmal begründen.</p>
-      <div class="alert">Der Agent darf Zweifel säen, aber keine Textzitate erfinden. Die Crew gewinnt fachlich durch begründete Antworten, nicht bloß durch Enttarnung.</div>
+      <p>4 Akten. 4 Minuten pro Runde.</p>
       <div class="teacher-sneakpeek">
-        <span class="eyebrow small-eyebrow">Lehrkraft-Info</span>
-        <strong>Geheimer Agent:</strong> <span class="agent-name">${esc(S.names[S.agentIndex])}</span>
+        <span class="eyebrow small-eyebrow">Lehrer</span>
+        <strong>Agent:</strong> <span class="agent-name">${esc(S.names[S.agentIndex])}</span>
       </div>
       <button onclick="startMission()">Akte 1 öffnen</button>
     </section>
@@ -272,17 +256,17 @@ function renderMission() {
         <span class="tag">${m.icon} ${m.room}</span>
         <span class="timer">${fmt(S.time)}</span>
       </div>
-      <div class="progress">
-        <div style="width:${(S.missions / missions.length) * 100}%"></div>
+      <div class="progress"><div style="width:${(S.missions / missions.length) * 100}%"></div></div>
+      <div class="mission-title-wrap">
+        <span class="mission-kicker">Akte ${S.missions + 1}</span>
+        <h2>${m.title}</h2>
       </div>
-      <h2>${m.title}</h2>
       <p class="quote">${m.prompt}</p>
-      <div>
+      <div class="choices">
         ${m.choices.map((choice, index) => `
           <button class="choice" onclick="answer(${index})">${String.fromCharCode(65 + index)} · ${choice}</button>
         `).join('')}
       </div>
-      <p class="small">Regel: Erst abstimmen, dann tippen. Nennt mindestens einen Grund und einen möglichen Einwand.</p>
     </section>
   `);
 }
@@ -298,10 +282,9 @@ function answer(i) {
   view(`
     <section class="panel ${ok ? 'success' : 'danger'} result-panel">
       <div class="eyebrow">Systemprüfung</div>
-      <h2>${ok ? 'Akte stabilisiert' : 'Fehlkopplung entdeckt'}</h2>
+      <h2>${ok ? 'Akte stabilisiert' : 'Fehlkopplung erkannt'}</h2>
       <p>${m.explain}</p>
-      <div class="card"><b>Mini-Sicherung</b><p>Formuliert gemeinsam einen Satz: „Nietzsche behauptet hier, dass …“ Eine andere Person ergänzt: „Dagegen könnte man einwenden, dass …“</p></div>
-      <button onclick="advance()">${S.missions < missions.length - 1 ? 'Nächste Akte' : 'Notfallkonferenz'}</button>
+      <button onclick="advance()">${S.missions < missions.length - 1 ? 'Nächste Akte' : 'Konferenz'}</button>
     </section>
   `);
 }
@@ -330,13 +313,11 @@ function meeting() {
         </div>
         <span class="timer">${fmt(S.time)}</span>
       </div>
-      <p>Jede Person erhält <b>45 Sekunden</b>: Verdacht plus fachlichen Beleg. Danach stimmt die Gruppe einmal ab.</p>
       <div class="grid votegrid">
         ${S.names.map((n, i) => `
           <button class="secondary" onclick="finish(${i})">${esc(n)}</button>
         `).join('')}
       </div>
-      <p class="small">Nicht Ausstrahlung bewerten, sondern Gesprächsbeiträge: Wer drängte zu zeitlosen, unbegründeten oder vorschnellen Deutungen?</p>
     </section>
   `);
 }
@@ -346,7 +327,7 @@ function finish(i) {
   const agent = S.agentIndex;
   const caught = i === agent;
   const percentage = Math.round((S.score / missions.length) * 100);
-  const stats = updateStats({ caught, score: S.score, agentIndex: agent });
+  updateStats({ caught, score: S.score, agentIndex: agent });
 
   S.lastOutcome = {
     caught,
@@ -360,39 +341,30 @@ function finish(i) {
   view(`
     <section class="panel summary-panel">
       <div class="eyebrow">Missionsprotokoll</div>
-      <h2>${caught ? 'Agent identifiziert' : 'Agent blieb unentdeckt'}</h2>
+      <h2>${caught ? 'Agent identifiziert' : 'Agent entkommen'}</h2>
 
       <div class="summary-grid">
         <div class="card summary-card agent-card">
-          <h3>Geheimer Agent</h3>
+          <h3>Agent</h3>
           <div class="agent-badge">${esc(S.names[agent])}</div>
           <p>Rolle: <strong>Agent des Ressentiments</strong></p>
         </div>
         <div class="card summary-card">
           <h3>Ergebnis</h3>
-          <div class="scoreline"><strong>${S.score}/${missions.length}</strong> <span>Fachpunkte</span></div>
-          <div class="scoreline"><strong>${percentage}%</strong> <span>Trefferquote</span></div>
-          <div class="scoreline"><strong>${caught ? 'Ja' : 'Nein'}</strong> <span>Verdacht korrekt</span></div>
+          <div class="scoreline"><strong>${S.score}/${missions.length}</strong> <span>Punkte</span></div>
+          <div class="scoreline"><strong>${percentage}%</strong> <span>Treffer</span></div>
+          <div class="scoreline"><strong>${caught ? 'Ja' : 'Nein'}</strong> <span>Gefasst</span></div>
         </div>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat"><strong>${stats.games}</strong><span>Spiele gesamt</span></div>
-        <div class="stat"><strong>${stats.agentFound}</strong><span>Agenten gefunden</span></div>
-        <div class="stat"><strong>${stats.agentEscaped}</strong><span>Agenten entkommen</span></div>
-        <div class="stat"><strong>${Math.round((stats.success / (stats.games * missions.length)) * 100) || 0}%</strong><span>Durchschnitt</span></div>
       </div>
 
       <div class="card exit-card">
         <h3>Exit-Ticket</h3>
         <ol>
           <li>Erkläre „Genealogie“ in einem Satz.</li>
-          <li>Nenne eine Wertverschiebung aus der ersten Abhandlung.</li>
-          <li>Formuliere eine Kritik an Nietzsches Vorgehen.</li>
+          <li>Nenne eine Wertverschiebung.</li>
+          <li>Formuliere eine Kritik.</li>
         </ol>
-        <p>Vervollständigt: „Nietzsches Genealogie macht Moral fragwürdig, aber nicht automatisch ungültig, weil …“</p>
       </div>
-
       <button onclick="home()">Neue Mission</button>
     </section>
   `);
@@ -423,34 +395,25 @@ function teacher() {
   view(`
     <section class="panel teacher-panel">
       <div class="eyebrow">Lehrkraft-Modus</div>
-      <h2>Unterrichtsrahmen EF NRW</h2>
-
+      <h2>Quick-Plan</h2>
       <div class="teacher-grid">
         <div class="card teacher-card danger-panel">
           <h3>Geheimer Agent</h3>
           <div class="bigrole bad">${esc(currentAgentName)}</div>
-          <p>Rolle: <strong>Agent des Ressentiments</strong></p>
-          <small>Nur für die Lehrkraft sichtbar. Die Schüler:innen sehen diese Information nicht.</small>
+          <p><strong>Nur für Lehrer sichtbar.</strong></p>
         </div>
-
         <div class="card teacher-card">
-          <h3>Kompetenzfokus</h3>
-          <p>Sachkompetenz: Position rekonstruieren. Methodenkompetenz: Begriffe und Argumente analysieren. Urteilskompetenz: Tragfähigkeit prüfen. Handlungskompetenz: kooperativ vertreten.</p>
-          <p><b>Didaktische Leitplanke:</b> „Herren-“ und „Sklavenmoral“ als Begriffe in Nietzsches Diagnose behandeln, nicht als Rollenetiketten für Lernende.</p>
+          <h3>Agenda</h3>
+          <ol>
+            <li>Einführung</li>
+            <li>Rollen</li>
+            <li>4 Akten</li>
+            <li>Konferenz</li>
+            <li>Exit-Ticket</li>
+          </ol>
         </div>
       </div>
-
-      <h3>60-Minuten-Ablauf</h3>
-      <ol>
-        <li><b>0–5:</b> Einstieg: „Sind moralische Werte entdeckt worden oder wurden sie gemacht?“</li>
-        <li><b>5–12:</b> Rollen und Briefing.</li>
-        <li><b>12–36:</b> vier Akten, je ca. 6 Minuten.</li>
-        <li><b>36–44:</b> Notfallkonferenz.</li>
-        <li><b>44–55:</b> fachliche Auswertung, Genese ≠ Geltung.</li>
-        <li><b>55–60:</b> Exit-Ticket.</li>
-      </ol>
-
-      <div class="alert"><b>Hinweis:</b> Die App ersetzt nicht die Textarbeit. Sie strukturiert Rekonstruktion, Kritik und Zusammenarbeit.</div>
+      <div class="alert">Wichtiger Fokus: Genese ≠ Geltung. Nietzsches Diagnose ist kein Rollenlabel.</div>
       <button onclick="home()">Zur Startseite</button>
     </section>
   `);
