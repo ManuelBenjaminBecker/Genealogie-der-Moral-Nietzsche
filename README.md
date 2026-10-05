@@ -4,7 +4,18 @@ Ein eigenständiges, offline spielbares Pass-and-play-Social-Deduction-Spiel fü
 
 ## Spielseite
 
+Hauptversion:
 https://manuelbenjaminbecker.github.io/Genealogie-der-Moral-Nietzsche/
+
+Lobby-Version (3–6 Spieler mit Code):
+https://manuelbenjaminbecker.github.io/Genealogie-der-Moral-Nietzsche/lobby-version/
+
+> Hinweis: GitHub Pages veröffentlicht nur den Branch bzw. die Quelle, die in den Repository-Einstellungen für Pages konfiguriert ist. Wenn die Lobby-Version im Browser noch 404 liefert, muss der veröffentlichte Branch die Inhalte aus `lobby-version/` enthalten.
+
+Version 2.0 Multiplayer (jedes iPad, gemeinsamer Echtzeitraum):
+https://manuelbenjaminbecker.github.io/Genealogie-der-Moral-Nietzsche/version-2.0-multiplayer/
+
+> Version 2.0 benötigt eine einmalige Firebase-Einrichtung. Die genaue Anleitung steht in `version-2.0-multiplayer/README.md`; GitHub Pages allein kann keine geräteübergreifenden Lobbys speichern.
 
 ## Spielen
 
