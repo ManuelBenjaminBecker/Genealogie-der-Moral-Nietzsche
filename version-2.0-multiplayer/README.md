@@ -20,7 +20,7 @@ GitHub Pages stellt die Website bereit. Damit mehrere Geräte denselben Spielsta
 ### 3. Realtime Database einrichten
 
 1. Öffne **Build → Realtime Database → Create Database**. Eine europäische Region ist für eine NRW-Klasse sinnvoll.
-2. Kopiere die Datenbank-URL aus der Konsole. Trage sie zusammen mit den Firebase-Werten in `firebase-config.js` ein. Die Beispieldatei liegt in diesem Ordner; ersetze alle `HIER_...`-Platzhalter.
+2. Kopiere die Datenbank-URL aus der Konsole. Trage sie zusammen mit den Firebase-Werten in `firebase-config.js` ein. Die Datei liegt in diesem Ordner; ersetze alle noch vorhandenen `HIER_...`-Platzhalter.
 3. Öffne den Tab **Rules** und ersetze die Regeln durch den gesamten Inhalt aus `database.rules.json`. Klicke **Publish**.
 
 Die Regeln machen individuelle Ergebniswerte nur für die jeweilige Person und den Host lesbar; gespeichert wird lediglich, ob die jeweilige Antwort richtig war. Rollen sind nur für die jeweilige Person lesbar und werden erst nach Spielende für alle sichtbar. Nur der Host kann Rollen setzen und die Runde verwalten.

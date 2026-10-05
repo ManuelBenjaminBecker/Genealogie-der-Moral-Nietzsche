@@ -689,8 +689,12 @@ function renderSetupError(message) {
 }
 
 async function bootstrap() {
-  if (firebaseConfig.apiKey.startsWith('HIER_') || firebaseConfig.projectId === 'HIER_PROJECT_ID') {
-    renderSetupError('Diese Version kann erst mit dem gemeinsamen Echtzeit-Backend mehrere iPads verbinden.');
+  if (
+    firebaseConfig.apiKey.startsWith('HIER_')
+    || firebaseConfig.projectId.startsWith('HIER_')
+    || firebaseConfig.databaseURL.startsWith('HIER_')
+  ) {
+    renderSetupError('Die Firebase-Konfiguration ist noch unvollständig. Es fehlt mindestens die Realtime-Database-URL.');
     return;
   }
   try {
