@@ -1,1 +1,483 @@
-:root{--bg:#07111f;--panel:#101e30;--ink:#f4f7fb;--muted:#aebbc9;--cyan:#5de2e7;--lime:#b9f46b;--red:#ff6474;--yellow:#ffd56a;--line:#29405b}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#17304b 0,#07111f 42%,#040912 100%);color:var(--ink);font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;min-height:100vh}.shell{max-width:980px;margin:auto;padding:max(18px,env(safe-area-inset-top)) 18px 40px}h1,h2,h3{margin:.2em 0 .55em;line-height:1.05}h1{font-size:clamp(2rem,7vw,4.8rem);letter-spacing:-.05em}.eyebrow{text-transform:uppercase;letter-spacing:.16em;color:var(--cyan);font-weight:900;font-size:.78rem}.panel{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:24px;padding:clamp(18px,4vw,34px);box-shadow:0 20px 70px #0008}.hero{min-height:78vh;display:grid;align-content:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.card{background:#0b1727;border:1px solid var(--line);border-radius:18px;padding:18px}.tag{display:inline-block;padding:7px 11px;border-radius:999px;background:#17334e;color:var(--cyan);font-weight:800;font-size:.84rem}.alert{border-left:5px solid var(--yellow);background:#312b18;padding:14px 16px;border-radius:12px}.danger{border-color:#723647;background:#29131c}.success{border-color:#41652e;background:#152318}.bigrole{font-size:clamp(2rem,8vw,5.2rem);font-weight:1000;letter-spacing:-.04em;color:var(--lime)}.bigrole.bad{color:var(--red)}button{appearance:none;border:0;border-radius:16px;background:var(--cyan);color:#04131b;font-weight:950;font-size:1rem;padding:15px 20px;min-height:52px;cursor:pointer;margin:6px 8px 6px 0}button.secondary{background:#20344b;color:var(--ink);border:1px solid #3d5774}button.danger{background:var(--red);color:#24050a}button:disabled{opacity:.4}.room{display:flex;gap:14px;align-items:flex-start}.room .icon{font-size:2.2rem;background:#17304b;width:64px;height:64px;display:grid;place-items:center;border-radius:18px}.choice{display:block;width:100%;text-align:left;background:#17293e;color:var(--ink);border:1px solid #34506c}.choice.selected{outline:3px solid var(--cyan)}.progress{height:12px;background:#07101c;border-radius:99px;overflow:hidden}.progress>div{height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime))}.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.timer{font-variant-numeric:tabular-nums;font-weight:1000;color:var(--yellow)}.quote{font-family:Georgia,serif;font-size:1.2rem;line-height:1.5;border-left:4px solid var(--cyan);padding-left:16px}.small{font-size:.9rem;color:var(--muted);line-height:1.45}.nameinput{width:100%;background:#091422;border:1px solid #3f5871;color:var(--ink);border-radius:13px;padding:14px;font-size:1rem;margin:5px 0}.votegrid button{min-height:72px}.reveal{animation:pop .28s ease-out}@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}@media (max-width:620px){.shell{padding:12px}.panel{border-radius:18px}.topbar{align-items:flex-start;flex-direction:column}}
+const app = document.querySelector('#app');
+const STORAGE_KEY = 'moralstation-state';
+const STATS_KEY = 'moralstation-stats';
+const defaultNames = ['Alex', 'Bela', 'Cem', 'Daria', 'Elif', 'Finn'];
+
+const S = {
+  screen: 'home',
+  names: [...defaultNames],
+  roles: [],
+  show: 0,
+  missions: 0,
+  score: 0,
+  answers: [],
+  votes: {},
+  time: 0,
+  timer: null,
+  agentIndex: null,
+  lastOutcome: null,
+  stats: loadStats(),
+  offline: !navigator.onLine
+};
+
+const missions = [
+  { room: 'Archiv', icon: '🗄️', title: 'Akte 1: Woher kommt „gut“?', prompt: 'Welche Aussage trifft Nietzsches genealogische Methode am ehesten?', choices: ['Moralbegriffe sind zeitlose Wahrheiten.', 'Moralbegriffe haben eine Geschichte und entstehen in Macht- und Deutungskämpfen.', 'Moral ist nur eine Frage des persönlichen Geschmacks.'], correct: 1, explain: 'Genealogie behandelt Moral nicht als selbstverständlich, sondern fragt nach Entstehungsbedingungen, Interessen und Wertverschiebungen.' },
+  { room: 'Wertelabor', icon: '⚗️', title: 'Akte 2: Zwei Wertungsweisen', prompt: 'Welche Zuordnung passt zur ersten Abhandlung?', choices: ['Vornehm: gut/schlecht; ressentimentgeprägt: gut/böse.', 'Vornehm: gut/böse; ressentimentgeprägt: wahr/falsch.', 'Beide Wertungsweisen meinen dasselbe.'], correct: 0, explain: 'Nietzsche kontrastiert die vornehme Selbstbejahung „gut/schlecht“ mit der reaktiven Umwertung „gut/böse“. Das ist Analyse seiner Argumentation, keine Zustimmung.' },
+  { room: 'Schuldkammer', icon: '⛓️', title: 'Akte 3: Schuld und Gedächtnis', prompt: 'Welche Entwicklung rekonstruiert Nietzsche?', choices: ['„Schuld“ entstand ausschließlich durch Religion.', 'Aus dem Verhältnis von Gläubiger und Schuldner werden Pflicht, Gedächtnis und später moralische Schuld gedeutet.', 'Schlechtes Gewissen ist angeboren.'], correct: 1, explain: 'Nietzsche verbindet Schuld zunächst mit dem Schuldnerverhältnis und beschreibt anschließend eine Verinnerlichung von Trieben.' },
+  { room: 'Observatorium', icon: '🔭', title: 'Akte 4: Kritik prüfen', prompt: 'Welche kritische Rückfrage ist philosophisch am stärksten?', choices: ['Ist Nietzsches historische Erzählung belegt und folgt aus Herkunft schon eine Bewertung?', 'Warum schreibt Nietzsche so kompliziert?', 'Darf man alte Texte überhaupt kritisieren?'], correct: 0, explain: 'Eine gute Prüfung trennt Genese und Geltung: Die Entstehung eines Wertes widerlegt ihn nicht automatisch. Zudem sind Nietzsches historische Behauptungen prüfbar.' }
+];
+
+function loadStats() {
+  try {
+    const value = localStorage.getItem(STATS_KEY);
+    if (!value) {
+      return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
+    }
+    const parsed = JSON.parse(value);
+    return {
+      games: Number(parsed.games) || 0,
+      success: Number(parsed.success) || 0,
+      agentFound: Number(parsed.agentFound) || 0,
+      agentEscaped: Number(parsed.agentEscaped) || 0,
+      history: Array.isArray(parsed.history) ? parsed.history : []
+    };
+  } catch {
+    return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
+  }
+}
+
+function saveStats() {
+  localStorage.setItem(STATS_KEY, JSON.stringify(S.stats));
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...S,
+    timer: null,
+    stats: undefined
+  }));
+}
+
+function readState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data && Array.isArray(data.names)) {
+      S.names = data.names;
+      S.roles = data.roles || [];
+      S.show = Number(data.show) || 0;
+      S.missions = Number(data.missions) || 0;
+      S.score = Number(data.score) || 0;
+      S.answers = Array.isArray(data.answers) ? data.answers : [];
+      S.votes = data.votes || {};
+      S.time = Number(data.time) || 0;
+      S.agentIndex = Number(data.agentIndex) || null;
+      S.lastOutcome = data.lastOutcome || null;
+      S.screen = data.screen || 'home';
+    }
+  } catch {}
+}
+
+function view(html) {
+  app.innerHTML = html;
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function logoMarkup() {
+  return `
+    <div class="brand-wrap" aria-label="Moralstation Logo">
+      <div class="brand-mark">M</div>
+      <div class="brand-copy">
+        <span class="brand-kicker">Philosophie EF</span>
+        <h1>Moralstation<br><span>GEN-1887</span></h1>
+      </div>
+    </div>
+  `;
+}
+
+function statsCardMarkup() {
+  const { games, success, agentFound, agentEscaped, history } = S.stats;
+  const avg = games ? Math.round((success / (games * missions.length)) * 100) : 0;
+  return `
+    <div class="stats-box">
+      <div class="stats-head">
+        <span class="eyebrow">Statistik</span>
+        <span class="status-pill ${navigator.onLine ? 'online' : 'offline'}">${navigator.onLine ? 'Online' : 'Offline'}</span>
+      </div>
+      <div class="stats-grid">
+        <div class="stat"><strong>${games}</strong><span>Spiele</span></div>
+        <div class="stat"><strong>${avg}%</strong><span>Durchschnitt</span></div>
+        <div class="stat"><strong>${agentFound}</strong><span>Agent gefunden</span></div>
+        <div class="stat"><strong>${agentEscaped}</strong><span>Agent entkommen</span></div>
+      </div>
+      <div class="history-list">
+        ${history.length ? history.slice(0, 3).map(item => `
+          <div class="history-item">
+            <span>${item.caught ? '✅ Agent gefasst' : '⚠️ Agent entkommen'}</span>
+            <small>${item.score}/${missions.length} Punkte</small>
+          </div>
+        `).join('') : '<div class="history-item empty"><span>Keine bisherigen Spiele.</span></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function home() {
+  clearInterval(S.timer);
+  const stats = readStats();
+  S.stats = stats;
+  saveState();
+  view(`
+    <section class="panel hero home-panel">
+      ${logoMarkup()}
+      <p class="quote">Nicht nur fragen: „Was ist gut?“, sondern: Wie wurden unsere Werte zu Werten?</p>
+      <div class="grid home-grid">
+        <div class="card">
+          <b>1 iPad · 6 Personen</b>
+          <p class="small">Pass-and-play. Rollen bleiben geheim. Keine Anmeldung, keine Datenübertragung.</p>
+        </div>
+        <div class="card">
+          <b>ca. 45–60 Minuten</b>
+          <p class="small">Rollen, vier Akten, Notfallkonferenz, Sicherung und Auswertung.</p>
+        </div>
+      </div>
+      <div class="action-stack">
+        <button onclick="setup()">Mission starten</button>
+        <button class="secondary" onclick="teacher()">Lehrkraft-Modus</button>
+      </div>
+      <div class="info-row">
+        <div class="pill">Offline-fähig</div>
+        <div class="pill">Keine Cookies</div>
+        <div class="pill">Keine externen Bibliotheken</div>
+      </div>
+      ${statsCardMarkup()}
+    </section>
+  `);
+}
+
+function setup() {
+  S.screen = 'setup';
+  view(`
+    <section class="panel setup-panel">
+      <div class="eyebrow">Crew registrieren</div>
+      <h2>Sechs Codenamen</h2>
+      <p>Ein iPad wandert gleich verdeckt durch die Gruppe. Jede Person sieht nur die eigene Rollenkarte.</p>
+      ${S.names.map((n, i) => `
+        <input class="nameinput" aria-label="Name ${i + 1}" value="${n}" oninput="S.names[${i}] = this.value; saveState();">
+      `).join('')}
+      <div class="action-stack compact">
+        <button onclick="deal()">Rollen auslosen</button>
+        <button class="secondary" onclick="home()">Zurück</button>
+      </div>
+    </section>
+  `);
+}
+
+function deal() {
+  const bad = Math.floor(Math.random() * 6);
+  S.roles = S.names.map((n, i) => i === bad ? 'Agent des Ressentiments' : 'Genealogische Crew');
+  S.agentIndex = bad;
+  S.show = 0;
+  S.missions = 0;
+  S.score = 0;
+  S.answers = [];
+  S.votes = {};
+  S.lastOutcome = null;
+  saveState();
+  passCard();
+}
+
+function passCard() {
+  const currentName = S.names[S.show];
+  view(`
+    <section class="panel hero pass-panel">
+      <div class="eyebrow">Geheime Übergabe ${S.show + 1}/6</div>
+      <h2>iPad an <span>${esc(currentName)}</span></h2>
+      <p>Alle anderen schauen weg. Tippe erst dann auf „Rolle anzeigen“.</p>
+      <button onclick="revealRole()">Rolle anzeigen</button>
+    </section>
+  `);
+}
+
+function revealRole() {
+  const currentIndex = S.show;
+  const currentName = S.names[currentIndex];
+  const isAgent = S.roles[currentIndex] === 'Agent des Ressentiments';
+
+  view(`
+    <section class="panel hero reveal ${isAgent ? 'danger' : 'success'}">
+      <div class="eyebrow">Nur für ${esc(currentName)}</div>
+      <div class="role-header">
+        <span class="badge ${isAgent ? 'badge-danger' : 'badge-success'}">${isAgent ? 'Agent' : 'Crew'}</span>
+      </div>
+      <div class="bigrole ${isAgent ? 'bad' : ''}">${S.roles[currentIndex]}</div>
+      ${isAgent ? `
+        <p><b>Geheimauftrag:</b> Bringe die Gruppe bei mindestens zwei Akten zu einer plausibel klingenden, aber unhistorischen oder vorschnellen Antwort. Du darfst argumentieren, aber keine Regeln brechen und keine falschen Zitate erfinden.</p>
+      ` : `
+        <p><b>Auftrag:</b> Rekonstruiert Nietzsches Argumente sauber. Achtet auf historische Entstehung, Perspektive und den Unterschied zwischen Beschreibung und Zustimmung.</p>
+      `}
+      <button onclick="nextRole()">Rolle verbergen & weiter</button>
+    </section>
+  `);
+}
+
+function nextRole() {
+  S.show += 1;
+  if (S.show < 6) {
+    passCard();
+  } else {
+    briefing();
+  }
+  saveState();
+}
+
+function briefing() {
+  view(`
+    <section class="panel briefing-panel">
+      <div class="eyebrow">Briefing</div>
+      <h2>Die Moralstation ist infiltriert.</h2>
+      <p>Bearbeitet vier Akten. Diskutiert jeweils <b>maximal 4 Minuten</b>. Eine Person bedient das iPad, alle müssen mindestens einmal begründen.</p>
+      <div class="alert">Der Agent darf Zweifel säen, aber keine Textzitate erfinden. Die Crew gewinnt fachlich durch begründete Antworten, nicht bloß durch Enttarnung.</div>
+      <div class="teacher-sneakpeek">
+        <span class="eyebrow small-eyebrow">Lehrkraft-Info</span>
+        <strong>Geheimer Agent:</strong> <span class="agent-name">${esc(S.names[S.agentIndex])}</span>
+      </div>
+      <button onclick="startMission()">Akte 1 öffnen</button>
+    </section>
+  `);
+}
+
+function startMission() {
+  S.time = 4 * 60;
+  runTimer();
+  renderMission();
+}
+
+function runTimer() {
+  clearInterval(S.timer);
+  S.timer = setInterval(() => {
+    S.time = Math.max(0, S.time - 1);
+    const timer = document.querySelector('.timer');
+    if (timer) timer.textContent = fmt(S.time);
+    if (!S.time) clearInterval(S.timer);
+  }, 1000);
+}
+
+function renderMission() {
+  const m = missions[S.missions];
+  view(`
+    <section class="panel mission-panel">
+      <div class="topbar">
+        <span class="tag">${m.icon} ${m.room}</span>
+        <span class="timer">${fmt(S.time)}</span>
+      </div>
+      <div class="progress">
+        <div style="width:${(S.missions / missions.length) * 100}%"></div>
+      </div>
+      <h2>${m.title}</h2>
+      <p class="quote">${m.prompt}</p>
+      <div>
+        ${m.choices.map((choice, index) => `
+          <button class="choice" onclick="answer(${index})">${String.fromCharCode(65 + index)} · ${choice}</button>
+        `).join('')}
+      </div>
+      <p class="small">Regel: Erst abstimmen, dann tippen. Nennt mindestens einen Grund und einen möglichen Einwand.</p>
+    </section>
+  `);
+}
+
+function answer(i) {
+  clearInterval(S.timer);
+  const m = missions[S.missions];
+  const ok = i === m.correct;
+  S.answers.push({ index: S.missions, chosen: i, correct: m.correct, ok });
+  if (ok) S.score += 1;
+  saveState();
+
+  view(`
+    <section class="panel ${ok ? 'success' : 'danger'} result-panel">
+      <div class="eyebrow">Systemprüfung</div>
+      <h2>${ok ? 'Akte stabilisiert' : 'Fehlkopplung entdeckt'}</h2>
+      <p>${m.explain}</p>
+      <div class="card"><b>Mini-Sicherung</b><p>Formuliert gemeinsam einen Satz: „Nietzsche behauptet hier, dass …“ Eine andere Person ergänzt: „Dagegen könnte man einwenden, dass …“</p></div>
+      <button onclick="advance()">${S.missions < missions.length - 1 ? 'Nächste Akte' : 'Notfallkonferenz'}</button>
+    </section>
+  `);
+}
+
+function advance() {
+  S.missions += 1;
+  if (S.missions < missions.length) {
+    S.time = 240;
+    runTimer();
+    renderMission();
+  } else {
+    meeting();
+  }
+  saveState();
+}
+
+function meeting() {
+  S.time = 300;
+  runTimer();
+  view(`
+    <section class="panel conference-panel">
+      <div class="topbar">
+        <div>
+          <div class="eyebrow">Notfallkonferenz</div>
+          <h2>Wer manipulierte die Deutungen?</h2>
+        </div>
+        <span class="timer">${fmt(S.time)}</span>
+      </div>
+      <p>Jede Person erhält <b>45 Sekunden</b>: Verdacht plus fachlichen Beleg. Danach stimmt die Gruppe einmal ab.</p>
+      <div class="grid votegrid">
+        ${S.names.map((n, i) => `
+          <button class="secondary" onclick="finish(${i})">${esc(n)}</button>
+        `).join('')}
+      </div>
+      <p class="small">Nicht Ausstrahlung bewerten, sondern Gesprächsbeiträge: Wer drängte zu zeitlosen, unbegründeten oder vorschnellen Deutungen?</p>
+    </section>
+  `);
+}
+
+function finish(i) {
+  clearInterval(S.timer);
+  const agent = S.agentIndex;
+  const caught = i === agent;
+  const percentage = Math.round((S.score / missions.length) * 100);
+  const stats = updateStats({ caught, score: S.score, agentIndex: agent });
+
+  S.lastOutcome = {
+    caught,
+    agentName: S.names[agent],
+    score: S.score,
+    percentage,
+    date: new Date().toISOString()
+  };
+  saveState();
+
+  view(`
+    <section class="panel summary-panel">
+      <div class="eyebrow">Missionsprotokoll</div>
+      <h2>${caught ? 'Agent identifiziert' : 'Agent blieb unentdeckt'}</h2>
+
+      <div class="summary-grid">
+        <div class="card summary-card agent-card">
+          <h3>Geheimer Agent</h3>
+          <div class="agent-badge">${esc(S.names[agent])}</div>
+          <p>Rolle: <strong>Agent des Ressentiments</strong></p>
+        </div>
+        <div class="card summary-card">
+          <h3>Ergebnis</h3>
+          <div class="scoreline"><strong>${S.score}/${missions.length}</strong> <span>Fachpunkte</span></div>
+          <div class="scoreline"><strong>${percentage}%</strong> <span>Trefferquote</span></div>
+          <div class="scoreline"><strong>${caught ? 'Ja' : 'Nein'}</strong> <span>Verdacht korrekt</span></div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat"><strong>${stats.games}</strong><span>Spiele gesamt</span></div>
+        <div class="stat"><strong>${stats.agentFound}</strong><span>Agenten gefunden</span></div>
+        <div class="stat"><strong>${stats.agentEscaped}</strong><span>Agenten entkommen</span></div>
+        <div class="stat"><strong>${Math.round((stats.success / (stats.games * missions.length)) * 100) || 0}%</strong><span>Durchschnitt</span></div>
+      </div>
+
+      <div class="card exit-card">
+        <h3>Exit-Ticket</h3>
+        <ol>
+          <li>Erkläre „Genealogie“ in einem Satz.</li>
+          <li>Nenne eine Wertverschiebung aus der ersten Abhandlung.</li>
+          <li>Formuliere eine Kritik an Nietzsches Vorgehen.</li>
+        </ol>
+        <p>Vervollständigt: „Nietzsches Genealogie macht Moral fragwürdig, aber nicht automatisch ungültig, weil …“</p>
+      </div>
+
+      <button onclick="home()">Neue Mission</button>
+    </section>
+  `);
+}
+
+function updateStats({ caught, score, agentIndex }) {
+  const stats = S.stats;
+  stats.games += 1;
+  stats.success += score;
+  if (caught) stats.agentFound += 1;
+  else stats.agentEscaped += 1;
+  stats.history.unshift({
+    caught,
+    score,
+    agentName: S.names[agentIndex],
+    date: new Date().toLocaleDateString('de-DE')
+  });
+  stats.history = stats.history.slice(0, 6);
+  S.stats = stats;
+  saveStats();
+  return stats;
+}
+
+function teacher() {
+  const agent = S.agentIndex !== null ? S.agentIndex : null;
+  const currentAgentName = agent !== null && S.names[agent] ? S.names[agent] : 'Noch nicht ausgelost';
+
+  view(`
+    <section class="panel teacher-panel">
+      <div class="eyebrow">Lehrkraft-Modus</div>
+      <h2>Unterrichtsrahmen EF NRW</h2>
+
+      <div class="teacher-grid">
+        <div class="card teacher-card danger-panel">
+          <h3>Geheimer Agent</h3>
+          <div class="bigrole bad">${esc(currentAgentName)}</div>
+          <p>Rolle: <strong>Agent des Ressentiments</strong></p>
+          <small>Nur für die Lehrkraft sichtbar. Die Schüler:innen sehen diese Information nicht.</small>
+        </div>
+
+        <div class="card teacher-card">
+          <h3>Kompetenzfokus</h3>
+          <p>Sachkompetenz: Position rekonstruieren. Methodenkompetenz: Begriffe und Argumente analysieren. Urteilskompetenz: Tragfähigkeit prüfen. Handlungskompetenz: kooperativ vertreten.</p>
+          <p><b>Didaktische Leitplanke:</b> „Herren-“ und „Sklavenmoral“ als Begriffe in Nietzsches Diagnose behandeln, nicht als Rollenetiketten für Lernende.</p>
+        </div>
+      </div>
+
+      <h3>60-Minuten-Ablauf</h3>
+      <ol>
+        <li><b>0–5:</b> Einstieg: „Sind moralische Werte entdeckt worden oder wurden sie gemacht?“</li>
+        <li><b>5–12:</b> Rollen und Briefing.</li>
+        <li><b>12–36:</b> vier Akten, je ca. 6 Minuten.</li>
+        <li><b>36–44:</b> Notfallkonferenz.</li>
+        <li><b>44–55:</b> fachliche Auswertung, Genese ≠ Geltung.</li>
+        <li><b>55–60:</b> Exit-Ticket.</li>
+      </ol>
+
+      <div class="alert"><b>Hinweis:</b> Die App ersetzt nicht die Textarbeit. Sie strukturiert Rekonstruktion, Kritik und Zusammenarbeit.</div>
+      <button onclick="home()">Zur Startseite</button>
+    </section>
+  `);
+}
+
+function fmt(s) {
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function readStats() {
+  try {
+    const raw = localStorage.getItem(STATS_KEY);
+    return raw ? JSON.parse(raw) : { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
+  } catch {
+    return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
+  }
+}
+
+readState();
+home();

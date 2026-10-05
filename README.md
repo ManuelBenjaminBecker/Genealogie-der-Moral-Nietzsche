@@ -1,21 +1,37 @@
-# Moralstation GEN-1887
+const CACHE_NAME = 'moralstation-v1';
+const APP_SHELL = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest'];
 
-Statische, iPad-taugliche Unterrichts-Webapp für eine EF-Philosophiestunde zu Friedrich Nietzsches *Zur Genealogie der Moral*. Für Gruppen mit genau 6 Personen, pass-and-play auf einem Gerät.
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+  );
+});
 
-## Schnellstart
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    ).then(() => self.clients.claim())
+  );
+});
 
-Alle vier Dateien in dasselbe GitHub-Repository legen. Dann unter **Settings > Pages** bei **Build and deployment** „Deploy from a branch“, Branch `main`, Ordner `/ (root)` wählen. Nach kurzer Zeit erscheint die öffentliche URL.
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
 
-Lokal genügt das Öffnen von `index.html`. Es werden keine externen Dienste, Cookies, Accounts oder personenbezogenen Daten benötigt. Codenamen bleiben nur im Browser und werden nicht übertragen.
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
 
-## Unterricht
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
 
-- Dauer: 45 bis 60 Minuten
-- Sozialform: Gruppen à 6, idealerweise ein iPad pro Gruppe
-- Lernprodukt: Antworten auf vier Akten, begründete Verdachtsabstimmung, Exit-Ticket
-- Inhalt: genealogische Methode; gut/schlecht und gut/böse; Schuld/Schuldner; Genese und Geltung
-- Hinweis: Das Spiel ist eigenständig gestaltet und verwendet keine offiziellen Grafiken, Sounds oder Figuren eines kommerziellen Spiels.
-
-## Anpassung
-
-Aufgaben stehen in `app.js` im Array `missions`. Texte, Zeit (`4*60`) und Namen können dort direkt geändert werden.
+      return fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match('./index.html'));
+    })
+  );
+});

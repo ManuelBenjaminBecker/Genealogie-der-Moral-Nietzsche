@@ -4,11 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Moralstation GEN-1887 – ein iPad-optimiertes Social-Deduction-Spiel für die Philosophiestunde zu Nietzsche.">
   <title>Genealogie: Moralstation</title>
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="app" class="shell" aria-live="polite"></main>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
   <script src="app.js"></script>
 </body>
 </html>
