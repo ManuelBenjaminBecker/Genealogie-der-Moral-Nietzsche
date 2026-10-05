@@ -1,12 +1,23 @@
-{
-  "name": "Moralstation GEN-1887",
-  "short_name": "Moralstation",
-  "description": "Pass-and-play Unterrichtsspiel für Nietzsches Genealogie der Moral.",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#07111f",
-  "theme_color": "#07111f",
-  "orientation": "portrait",
-  "lang": "de"
-}
+const CACHE_NAME = 'moralstation-v2';
+const APP_FILES = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+    ))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
+  );
+});

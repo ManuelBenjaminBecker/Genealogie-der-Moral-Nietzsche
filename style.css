@@ -1,446 +1,203 @@
-const app = document.querySelector('#app');
-const STORAGE_KEY = 'moralstation-state';
-const STATS_KEY = 'moralstation-stats';
-const defaultNames = ['Alex', 'Bela', 'Cem', 'Daria', 'Elif', 'Finn'];
-
-const S = {
-  screen: 'home',
-  names: [...defaultNames],
-  roles: [],
-  show: 0,
-  missions: 0,
-  score: 0,
-  answers: [],
-  votes: {},
-  time: 0,
-  timer: null,
-  agentIndex: null,
-  lastOutcome: null,
-  stats: loadStats(),
-  offline: !navigator.onLine
-};
-
-const missions = [
-  { room: 'Archiv', icon: '🗄️', title: 'Akte 1: Woher kommt „gut“?', prompt: 'Welche Aussage trifft Nietzsches genealogische Methode am ehesten?', choices: ['Moralbegriffe sind zeitlose Wahrheiten.', 'Moralbegriffe haben eine Geschichte und entstehen in Macht- und Deutungskämpfen.', 'Moral ist nur eine Frage des persönlichen Geschmacks.'], correct: 1, explain: 'Genealogie behandelt Moral nicht als selbstverständlich, sondern fragt nach Entstehungsbedingungen, Interessen und Wertverschiebungen.' },
-  { room: 'Wertelabor', icon: '⚗️', title: 'Akte 2: Zwei Wertungsweisen', prompt: 'Welche Zuordnung passt zur ersten Abhandlung?', choices: ['Vornehm: gut/schlecht; ressentimentgeprägt: gut/böse.', 'Vornehm: gut/böse; ressentimentgeprägt: wahr/falsch.', 'Beide Wertungsweisen meinen dasselbe.'], correct: 0, explain: 'Nietzsche kontrastiert die vornehme Selbstbejahung „gut/schlecht“ mit der reaktiven Umwertung „gut/böse“. Das ist Analyse seiner Argumentation, keine Zustimmung.' },
-  { room: 'Schuldkammer', icon: '⛓️', title: 'Akte 3: Schuld und Gedächtnis', prompt: 'Welche Entwicklung rekonstruiert Nietzsche?', choices: ['„Schuld“ entstand ausschließlich durch Religion.', 'Aus dem Verhältnis von Gläubiger und Schuldner werden Pflicht, Gedächtnis und später moralische Schuld gedeutet.', 'Schlechtes Gewissen ist angeboren.'], correct: 1, explain: 'Nietzsche verbindet Schuld zunächst mit dem Schuldnerverhältnis und beschreibt anschließend eine Verinnerlichung von Trieben.' },
-  { room: 'Observatorium', icon: '🔭', title: 'Akte 4: Kritik prüfen', prompt: 'Welche kritische Rückfrage ist philosophisch am stärksten?', choices: ['Ist Nietzsches historische Erzählung belegt und folgt aus Herkunft schon eine Bewertung?', 'Warum schreibt Nietzsche so kompliziert?', 'Darf man alte Texte überhaupt kritisieren?'], correct: 0, explain: 'Eine gute Prüfung trennt Genese und Geltung: Die Entstehung eines Wertes widerlegt ihn nicht automatisch. Zudem sind Nietzsches historische Behauptungen prüfbar.' }
-];
-
-function loadStats() {
-  try {
-    const value = localStorage.getItem(STATS_KEY);
-    if (!value) return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
-    const parsed = JSON.parse(value);
-    return {
-      games: Number(parsed.games) || 0,
-      success: Number(parsed.success) || 0,
-      agentFound: Number(parsed.agentFound) || 0,
-      agentEscaped: Number(parsed.agentEscaped) || 0,
-      history: Array.isArray(parsed.history) ? parsed.history : []
-    };
-  } catch {
-    return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
-  }
+:root {
+  color-scheme: dark;
+  --space: #07111d;
+  --panel: #101d2a;
+  --panel-soft: #142434;
+  --line: #263b4c;
+  --ink: #f4f6f8;
+  --muted: #a0b0bc;
+  --red: #f2545b;
+  --red-dark: #bc333e;
+  --cyan: #65d8e6;
+  --green: #75dc9a;
+  --yellow: #f9cd65;
+  --display: Impact, "Arial Narrow", sans-serif;
+  --body: "Avenir Next", Avenir, ui-rounded, system-ui, sans-serif;
 }
 
-function saveStats() {
-  localStorage.setItem(STATS_KEY, JSON.stringify(S.stats));
+* { box-sizing: border-box; }
+
+html { min-width: 320px; background: var(--space); }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(ellipse at 50% -30%, rgba(42, 86, 113, .25), transparent 64%),
+    linear-gradient(150deg, #0a1724, #050b13 70%);
+  color: var(--ink);
+  font: 16px/1.55 var(--body);
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    ...S,
-    timer: null,
-    stats: undefined
-  }));
+button, input { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+
+.shell { width: min(1120px, 100%); min-height: 100vh; margin: auto; padding: 0 30px 28px; }
+.home-screen { min-height: 100vh; }
+
+.sitebar {
+  height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(144, 173, 194, .13);
 }
 
-function readState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (data && Array.isArray(data.names)) {
-      S.names = data.names;
-      S.roles = data.roles || [];
-      S.show = Number(data.show) || 0;
-      S.missions = Number(data.missions) || 0;
-      S.score = Number(data.score) || 0;
-      S.answers = Array.isArray(data.answers) ? data.answers : [];
-      S.votes = data.votes || {};
-      S.time = Number(data.time) || 0;
-      S.agentIndex = Number(data.agentIndex) || null;
-      S.lastOutcome = data.lastOutcome || null;
-      S.screen = data.screen || 'home';
-    }
-  } catch {}
+.wordmark { display: inline-flex; align-items: center; gap: 13px; color: var(--ink); text-decoration: none; font-weight: 900; font-size: .83rem; letter-spacing: .17em; }
+.wordmark-light { color: #8a9ba9; }
+.class-chip { display: inline-flex; align-items: center; gap: 9px; color: #b9c5cc; font-size: .69rem; font-weight: 800; letter-spacing: .12em; }
+.status-dot { display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px rgba(117, 220, 154, .56); }
+
+.hero-layout { min-height: 535px; display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; gap: 20px; padding: 54px 0 40px; }
+.hero-copy { position: relative; z-index: 1; }
+.eyebrow { margin: 0 0 13px; color: var(--cyan); font-size: .7rem; line-height: 1.4; font-weight: 800; letter-spacing: .16em; }
+.hero-copy .eyebrow { display: flex; align-items: center; gap: 10px; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { margin: 16px 0 17px; font: 900 clamp(3.8rem, 8.6vw, 7.1rem)/.81 var(--display); letter-spacing: -.035em; text-transform: uppercase; }
+.highlight { color: var(--red); }
+.hero-description { max-width: 530px; color: #bdc8d0; font-size: 1.02rem; line-height: 1.68; }
+.hero-actions, .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+.button { min-height: 52px; padding: 0 20px; border: 1px solid transparent; border-radius: 9px; cursor: pointer; font-size: .84rem; font-weight: 800; transition: transform .16s ease, filter .16s ease, background .16s ease; }
+.button:hover, .vote-card:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.button-primary { color: white; background: linear-gradient(120deg, #ec4c56, #bc3541); box-shadow: 0 9px 28px rgba(220, 58, 69, .23); }
+.button-primary span { margin-left: 15px; font-size: 1.1rem; }
+.button-quiet { color: #d3dce2; background: #132230; border-color: #344958; }
+.promise-row { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 33px; color: #91a2af; font-size: .7rem; }
+.promise-row span::first-letter { color: var(--cyan); }
+
+.station-art { position: relative; min-height: 400px; overflow: hidden; display: grid; place-items: center; isolation: isolate; border: 1px solid rgba(110, 153, 179, .17); border-radius: 49% 49% 15px 15px; background: radial-gradient(ellipse at 48% 55%, rgba(46, 101, 132, .28), transparent 56%), linear-gradient(160deg, #142b3a, #0a1723 65%); }
+.station-art::before, .station-art::after { position: absolute; z-index: -1; content: ""; border: 1px solid rgba(118, 173, 202, .14); border-radius: 50%; }
+.station-art::before { width: 350px; height: 350px; }
+.station-art::after { width: 270px; height: 270px; }
+.orbit { position: absolute; z-index: -1; border: 1px solid rgba(102, 217, 231, .19); border-radius: 50%; transform: rotate(-28deg); }
+.orbit-one { width: 420px; height: 150px; }
+.orbit-two { width: 455px; height: 250px; transform: rotate(37deg); }
+.star { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #d6f3f7; box-shadow: 0 0 8px #d6f3f7; }
+.star-one { top: 22%; left: 24%; }.star-two { top: 34%; right: 23%; }.star-three { bottom: 26%; left: 19%; }.star-four { right: 31%; bottom: 17%; width: 2px; height: 2px; }
+.art-label { position: absolute; color: #8198a7; font-size: .59rem; font-weight: 700; letter-spacing: .15em; }
+.label-top { top: 27px; left: 28px; }.label-bottom { bottom: 24px; right: 28px; display: flex; align-items: center; gap: 8px; }
+.label-bottom .status-dot { width: 6px; height: 6px; }
+.hero-crewmate { position: relative; display: grid; place-items: center; width: 190px; height: 220px; transform: translateY(3px); }
+.hero-crewmate > .crewmate { transform: scale(1.6); }
+.shadow { position: absolute; z-index: -1; bottom: 19px; left: 25px; width: 140px; height: 23px; border-radius: 50%; background: #03080d; filter: blur(8px); }
+
+.crewmate { --suit: var(--red); position: relative; display: inline-block; flex: 0 0 auto; width: 38px; height: 39px; border: 2px solid rgba(255,255,255,.18); border-radius: 48% 45% 34% 34%; background: linear-gradient(115deg, color-mix(in srgb, var(--suit), white 17%), var(--suit) 56%, color-mix(in srgb, var(--suit), black 24%)); box-shadow: inset -4px -4px 0 rgba(0,0,0,.12), 0 3px 5px rgba(0,0,0,.25); }
+.crewmate::before { position: absolute; content: ""; left: 4px; right: 4px; bottom: -4px; height: 10px; border-radius: 2px 2px 5px 5px; background: var(--suit); box-shadow: 18px 0 0 -1px color-mix(in srgb, var(--suit), black 12%); }
+.crewmate .visor { position: absolute; top: 8px; right: -6px; width: 25px; height: 13px; border: 2px solid #263d4b; border-radius: 10px 8px 8px 10px; background: linear-gradient(135deg, #d6f9ff, #62c5df 66%, #388da8); box-shadow: inset -3px -2px 0 rgba(16, 58, 77, .23); }
+.crewmate .pack { position: absolute; left: -7px; top: 13px; width: 8px; height: 17px; border-radius: 4px 2px 3px 4px; background: color-mix(in srgb, var(--suit), black 18%); border: 1px solid rgba(255,255,255,.13); }
+.crewmate.tiny { transform: scale(.68); transform-origin: center; margin: -5px; }
+.crewmate.large { transform: scale(1.7); margin: 22px 25px 27px; }
+.crewmate.red { --suit: #f2545b; }.crewmate.blue { --suit: #4b9ee6; }.crewmate.yellow { --suit: #f2ce51; }.crewmate.green { --suit: #58c887; }.crewmate.pink { --suit: #d883c3; }.crewmate.orange { --suit: #ec9852; }.crewmate.cyan { --suit: #55c5d8; }
+
+.brief-strip { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid rgba(139, 166, 184, .17); border-radius: 12px; background: rgba(17, 32, 45, .75); }
+.brief-strip > div { display: flex; align-items: center; gap: 14px; padding: 20px 23px; }
+.brief-strip > div + div { border-left: 1px solid rgba(139, 166, 184, .17); }
+.brief-number { color: var(--red); font: 800 1.55rem var(--display); }
+.brief-strip b, .brief-strip small { display: block; }.brief-strip b { font-size: .79rem; }.brief-strip small { margin-top: 2px; color: #8798a6; font-size: .68rem; }
+.home-footer { display: flex; justify-content: space-between; gap: 14px; padding: 23px 0; color: #738592; font-size: .65rem; }
+
+.panel { width: min(760px, 100%); margin: 58px auto; padding: clamp(24px, 5vw, 48px); border: 1px solid #2b4152; border-radius: 16px; background: linear-gradient(145deg, rgba(20, 38, 53, .98), rgba(11, 24, 36, .98)); box-shadow: 0 25px 85px rgba(0,0,0,.33); }
+.panel h2 { margin: 0 0 13px; font: 800 clamp(2.4rem, 7vw, 4rem)/.95 var(--display); text-transform: uppercase; letter-spacing: -.015em; }
+.panel p { color: #b2c0ca; }
+.screen-heading { margin-bottom: 26px; }.screen-heading > p:last-child { margin-bottom: 0; }
+.crew-form { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.name-field { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 8px 13px; border: 1px solid #344a5a; border-radius: 8px; background: #0b1824; }
+.player-number { color: var(--cyan); font: 700 .82rem var(--display); }
+.nameinput { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; }
+.nameinput:focus-visible { outline: 0; }.name-field:focus-within { border-color: var(--cyan); }
+.notice { display: flex; align-items: flex-start; gap: 11px; margin: 24px 0 4px; padding: 14px 16px; border: 1px solid rgba(101, 216, 230, .2); border-radius: 8px; background: rgba(101, 216, 230, .065); color: #b9ccd3; font-size: .79rem; }
+.notice-icon { display: inline-grid; flex: 0 0 19px; width: 19px; height: 19px; place-items: center; border-radius: 50%; color: #09202a; background: var(--cyan); font-size: .72rem; font-weight: 900; }
+.notice-warn { border-color: rgba(249, 205, 101, .23); background: rgba(249, 205, 101, .07); }.notice-warn .notice-icon { color: #221a08; background: var(--yellow); }
+
+.pass-panel, .role-panel { text-align: center; max-width: 600px; padding-top: 50px; padding-bottom: 48px; }
+.pass-panel > p:not(.eyebrow), .role-panel > p:not(.eyebrow) { max-width: 420px; margin: 10px auto 24px; }
+.handoff-icon, .role-icon { display: grid; place-items: center; min-height: 110px; }
+.pass-count, .role-label { color: #8b9eac !important; font-size: .66rem; font-weight: 800; letter-spacing: .18em; }
+.pass-panel h2 { margin-top: 10px; }.role-panel h2 { color: var(--red); }
+.role-crew h2 { color: var(--green); }.role-crew .eyebrow { color: var(--green); }
+.role-panel .button, .pass-panel .button { margin-top: 6px; }
+
+.briefing-panel > h2 { max-width: 520px; }.lead { font-size: 1rem; line-height: 1.7; }
+.task-route { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin: 28px 0; }
+.route-stop { display: grid; justify-items: center; gap: 5px; padding: 14px 5px; border: 1px solid #304757; border-radius: 9px; background: #0c1925; }
+.route-stop > span { color: var(--cyan); font-size: 1.3rem; }.route-stop small { color: var(--red); font: 700 .7rem var(--display); }.route-stop b { color: #c9d4db; font-size: .68rem; }
+.briefing-panel > .button { margin-top: 24px; }
+
+.mission-panel { width: min(800px, 100%); }
+.mission-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.timer { min-width: 69px; text-align: center; color: var(--yellow); font: 700 1.18rem var(--display); letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+.route-progress { display: flex; align-items: center; gap: 8px; margin: 13px 0 23px; }
+.route-node { display: grid; flex: 1; height: 5px; place-items: center; border-radius: 10px; color: #7b8e9b; background: #304352; font-size: 0; }
+.route-node.active { background: var(--red); box-shadow: 0 0 13px rgba(242, 84, 91, .5); }.route-node.complete { background: var(--green); }
+.room-card { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid #314a5b; border-radius: 10px; background: linear-gradient(110deg, #152d3b, #122332); }
+.room-icon { display: grid; flex: 0 0 45px; width: 45px; height: 45px; place-items: center; border-radius: 8px; color: var(--cyan); background: rgba(101,216,230,.11); font-size: 1.5rem; }
+.room-card .eyebrow { margin-bottom: 1px; font-size: .58rem; }.room-card h2 { margin: 0; font-size: 1.6rem; }
+.signal-bars { display: flex; align-items: flex-end; gap: 3px; margin-left: auto; height: 22px; }.signal-bars i { width: 4px; border-radius: 2px; background: var(--green); }.signal-bars i:nth-child(1) { height: 8px; }.signal-bars i:nth-child(2) { height: 15px; }.signal-bars i:nth-child(3) { height: 21px; }
+.mission-question { margin: 26px 0 18px; }.task-type { color: var(--red); font-size: .62rem; font-weight: 800; letter-spacing: .15em; }.mission-question h3 { margin: 8px 0; font: 700 1.8rem/1.1 var(--display); }.mission-question p { margin-bottom: 0; color: #cfdae0; }
+.choices { display: grid; gap: 9px; margin-top: 19px; }
+.choice { display: grid; grid-template-columns: 35px 1fr 20px; align-items: center; gap: 11px; width: 100%; min-height: 66px; padding: 11px 15px; border: 1px solid #304655; border-radius: 9px; text-align: left; background: #101f2c; cursor: pointer; transition: border .15s, background .15s, transform .15s; }
+.choice:hover { border-color: var(--cyan); background: #142a37; transform: translateX(2px); }
+.choice-letter { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 7px; color: var(--cyan); background: rgba(101,216,230,.1); font: 700 .9rem var(--display); }.choice-arrow { color: #8297a5; text-align: right; }
+.discussion-tip { display: flex; gap: 9px; align-items: flex-start; margin: 20px 0 0 !important; color: #91a2ae !important; font-size: .72rem; }.discussion-tip span { color: var(--cyan); }
+
+.result-panel { text-align: center; }.result-mark { display: grid; width: 58px; height: 58px; place-items: center; margin: 19px auto; border: 1px solid currentColor; border-radius: 50%; color: var(--green); font-size: 1.6rem; font-weight: 700; }.failure .result-mark { color: var(--yellow); }.result-panel h2 { font-size: clamp(2rem, 6vw, 3.3rem); }
+.explanation { max-width: 570px; margin: 0 auto 22px; }.reflection-card { padding: 17px 20px; border: 1px solid #304756; border-radius: 9px; text-align: left; background: rgba(5, 15, 24, .5); }.reflection-card p { margin: 6px 0 0; }.result-panel > .button { margin-top: 24px; }
+
+.meeting-panel { padding: 0; overflow: hidden; }.meeting-banner { display: flex; align-items: center; gap: 11px; padding: 15px 25px; color: #fff; background: linear-gradient(90deg, #ae2634, #dc3e49); font-size: .75rem; font-weight: 900; letter-spacing: .16em; }.meeting-banner .timer { margin-left: auto; color: #fff; }
+.alert-beacon { width: 9px; height: 9px; border-radius: 50%; background: white; box-shadow: 0 0 15px white; animation: blink 1.1s infinite; }
+@keyframes blink { 50% { opacity: .28; } }
+.meeting-content { padding: clamp(24px, 5vw, 44px); }.meeting-content h2 { font-size: clamp(2.8rem, 8vw, 5rem); }.meeting-content > p:not(.eyebrow) { max-width: 560px; }
+.vote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin: 25px 0 13px; }
+.vote-card { display: flex; align-items: center; gap: 13px; min-height: 63px; padding: 10px 13px; border: 1px solid #334b5b; border-radius: 8px; background: #10202d; cursor: pointer; text-align: left; transition: transform .15s, border .15s; }.vote-card:hover { border-color: var(--red); }
+.vote-avatar { display: inline-grid; width: 35px; height: 39px; place-items: center; }.vote-avatar .crewmate { transform: scale(.77); }.vote-arrow { margin-left: auto; color: #8ba0ac; }
+
+.summary-heading { display: flex; align-items: center; gap: 17px; margin: 22px 0; }.summary-heading .crewmate { margin: 14px 15px 16px 6px; }.summary-heading h2 { margin: 0 0 5px; font-size: clamp(2rem, 6vw, 3.4rem); }.summary-heading p { margin: 0; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 25px 0; }.summary-stat { min-width: 0; padding: 16px; border: 1px solid #314958; border-radius: 9px; background: #0d1b27; }.summary-stat span, .summary-stat b { display: block; }.summary-stat span { color: #92a5b1; font-size: .7rem; }.summary-stat b { margin-top: 8px; color: var(--cyan); font-size: 1rem; overflow-wrap: anywhere; }
+.exit-ticket h3 { margin: 8px 0; font: 700 1.45rem var(--display); }.exit-ticket ol { margin: 10px 0 0; padding-left: 20px; color: #b8c7cf; font-size: .82rem; }.exit-ticket li + li { margin-top: 6px; }
+
+.teacher-panel { width: min(900px, 100%); }.teacher-panel > h2 { max-width: 700px; }.teacher-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 25px 0; }.teacher-card { padding: 18px; border: 1px solid #304655; border-radius: 9px; background: #0e1d29; }.teacher-icon { color: var(--cyan); font-size: 1.5rem; }.teacher-card h3 { margin: 11px 0 7px; font: 700 1.35rem var(--display); }.teacher-card p { margin: 0; color: #aebdc6; font-size: .77rem; line-height: 1.6; }.teacher-small { margin: 20px 0 0; color: #82939e !important; font-size: .72rem; }
+
+@media (max-width: 760px) {
+  .shell { padding: 0 18px 18px; }
+  .sitebar { height: 70px; }
+  .hero-layout { grid-template-columns: 1fr .72fr; min-height: 490px; gap: 5px; padding: 45px 0 32px; }
+  h1 { font-size: clamp(3.6rem, 10vw, 5.3rem); }
+  .station-art { min-height: 340px; }
+  .hero-crewmate { transform: scale(.84); }
+  .brief-strip > div { gap: 9px; padding: 15px 12px; }
+  .teacher-cards { grid-template-columns: 1fr; }
 }
 
-function view(html) {
-  app.innerHTML = html;
-  window.scrollTo({ top: 0, behavior: 'auto' });
+@media (max-width: 560px) {
+  .shell { padding: 0 14px 14px; }
+  .class-chip { font-size: .58rem; letter-spacing: .08em; }
+  .hero-layout { display: flex; flex-direction: column; align-items: stretch; gap: 25px; padding-top: 39px; }
+  h1 { font-size: clamp(4.05rem, 17vw, 5.6rem); }
+  .hero-description { font-size: .94rem; }
+  .promise-row { gap: 8px 15px; font-size: .62rem; }
+  .station-art { min-height: 270px; border-radius: 130px 130px 12px 12px; }
+  .hero-crewmate { min-height: 190px; transform: scale(.75); }
+  .brief-strip { grid-template-columns: 1fr; }
+  .brief-strip > div { padding: 12px 17px; }
+  .brief-strip > div + div { border-top: 1px solid rgba(139,166,184,.17); border-left: 0; }
+  .home-footer { flex-direction: column; padding-top: 16px; }
+  .panel { margin: 24px auto; padding: 24px 19px; }
+  .crew-form { grid-template-columns: 1fr; gap: 8px; }
+  .task-route { gap: 5px; }
+  .route-stop { padding: 11px 3px; }.route-stop b { font-size: .6rem; }
+  .mission-topline { align-items: flex-start; }.mission-topline .eyebrow { max-width: 70%; }
+  .choice { grid-template-columns: 29px 1fr 14px; gap: 8px; padding: 10px; font-size: .87rem; }
+  .choice-letter { width: 27px; height: 27px; }
+  .vote-grid { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: 1fr; gap: 7px; }
+  .summary-stat { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; }.summary-stat b { margin: 0; text-align: right; }
+  .summary-heading { align-items: flex-start; gap: 7px; }.summary-heading .crewmate { transform: scale(1.35); transform-origin: left center; margin-right: 3px; }
+  .hero-actions .button { width: 100%; }
+  .button-row .button { flex: 1; }
 }
 
-function logoMarkup() {
-  return `
-    <div class="brand-wrap" aria-label="Moralstation Logo">
-      <div class="brand-mark">M</div>
-      <div class="brand-copy">
-        <span class="brand-kicker">Philosophie EF</span>
-        <h1>Moralstation<br><span>GEN-1887</span></h1>
-      </div>
-    </div>
-  `;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
-
-function statsCardMarkup() {
-  const { games, success, agentFound, agentEscaped, history } = S.stats;
-  const avg = games ? Math.round((success / (games * missions.length)) * 100) : 0;
-  return `
-    <div class="stats-box">
-      <div class="stats-head">
-        <span class="eyebrow">Statistik</span>
-        <span class="status-pill ${navigator.onLine ? 'online' : 'offline'}">${navigator.onLine ? 'Online' : 'Offline'}</span>
-      </div>
-      <div class="stats-grid">
-        <div class="stat"><strong>${games}</strong><span>Spiele</span></div>
-        <div class="stat"><strong>${avg}%</strong><span>Durchschnitt</span></div>
-        <div class="stat"><strong>${agentFound}</strong><span>Agent</span></div>
-        <div class="stat"><strong>${agentEscaped}</strong><span>Escape</span></div>
-      </div>
-      <div class="history-list">
-        ${history.length ? history.slice(0, 3).map((item) => `
-          <div class="history-item">
-            <span>${item.caught ? '✅ erkannt' : '⚠️ entkommen'}</span>
-            <small>${item.score}/${missions.length}</small>
-          </div>
-        `).join('') : '<div class="history-item empty"><span>Keine Spiele bisher.</span></div>'}
-      </div>
-    </div>
-  `;
-}
-
-function home() {
-  clearInterval(S.timer);
-  const stats = readStats();
-  S.stats = stats;
-  saveState();
-  view(`
-    <section class="panel hero home-panel">
-      ${logoMarkup()}
-      <div class="home-tagline">Mission für 6 · 4 Akten · 1 Agent</div>
-      <div class="home-meta">
-        <span>1 iPad</span>
-        <span>6 Spieler</span>
-        <span>Offline</span>
-      </div>
-      <div class="action-stack">
-        <button onclick="setup()">Mission starten</button>
-        <button class="secondary" onclick="teacher()">Lehrer</button>
-      </div>
-      ${statsCardMarkup()}
-    </section>
-  `);
-}
-
-function setup() {
-  S.screen = 'setup';
-  view(`
-    <section class="panel setup-panel">
-      <div class="eyebrow">Crew registrieren</div>
-      <h2>Sechs Codenamen</h2>
-      <p>Ein iPad wandert verdeckt durch die Gruppe.</p>
-      ${S.names.map((n, i) => `
-        <input class="nameinput" aria-label="Name ${i + 1}" value="${n}" oninput="S.names[${i}] = this.value; saveState();">
-      `).join('')}
-      <div class="action-stack compact">
-        <button onclick="deal()">Rollen auslosen</button>
-        <button class="secondary" onclick="home()">Zurück</button>
-      </div>
-    </section>
-  `);
-}
-
-function deal() {
-  const bad = Math.floor(Math.random() * 6);
-  S.roles = S.names.map((n, i) => i === bad ? 'Agent des Ressentiments' : 'Genealogische Crew');
-  S.agentIndex = bad;
-  S.show = 0;
-  S.missions = 0;
-  S.score = 0;
-  S.answers = [];
-  S.votes = {};
-  S.lastOutcome = null;
-  saveState();
-  passCard();
-}
-
-function passCard() {
-  const currentName = S.names[S.show];
-  view(`
-    <section class="panel hero pass-panel">
-      <div class="eyebrow">Geheime Übergabe ${S.show + 1}/6</div>
-      <h2>iPad an <span>${esc(currentName)}</span></h2>
-      <p>Alle anderen schauen weg.</p>
-      <button onclick="revealRole()">Rolle anzeigen</button>
-    </section>
-  `);
-}
-
-function revealRole() {
-  const currentIndex = S.show;
-  const currentName = S.names[currentIndex];
-  const isAgent = S.roles[currentIndex] === 'Agent des Ressentiments';
-
-  view(`
-    <section class="panel hero reveal ${isAgent ? 'danger' : 'success'}">
-      <div class="eyebrow">Nur für ${esc(currentName)}</div>
-      <div class="role-header">
-        <span class="badge ${isAgent ? 'badge-danger' : 'badge-success'}">${isAgent ? 'Agent' : 'Crew'}</span>
-      </div>
-      <div class="bigrole ${isAgent ? 'bad' : ''}">${S.roles[currentIndex]}</div>
-      ${isAgent ? `
-        <p><b>Geheimauftrag:</b> Bring die Gruppe bei mindestens zwei Akten zu einer vorschnellen oder unhistorischen Antwort.</p>
-      ` : `
-        <p><b>Auftrag:</b> Rekonstruiert die Argumente sauber und achtet auf Genese und Geltung.</p>
-      `}
-      <button onclick="nextRole()">Weiter</button>
-    </section>
-  `);
-}
-
-function nextRole() {
-  S.show += 1;
-  if (S.show < 6) passCard();
-  else briefing();
-  saveState();
-}
-
-function briefing() {
-  view(`
-    <section class="panel briefing-panel">
-      <div class="eyebrow">Briefing</div>
-      <h2>Die Moralstation ist infiltriert.</h2>
-      <p>4 Akten. 4 Minuten pro Runde.</p>
-      <div class="teacher-sneakpeek">
-        <span class="eyebrow small-eyebrow">Lehrer</span>
-        <strong>Agent:</strong> <span class="agent-name">${esc(S.names[S.agentIndex])}</span>
-      </div>
-      <button onclick="startMission()">Akte 1 öffnen</button>
-    </section>
-  `);
-}
-
-function startMission() {
-  S.time = 4 * 60;
-  runTimer();
-  renderMission();
-}
-
-function runTimer() {
-  clearInterval(S.timer);
-  S.timer = setInterval(() => {
-    S.time = Math.max(0, S.time - 1);
-    const timer = document.querySelector('.timer');
-    if (timer) timer.textContent = fmt(S.time);
-    if (!S.time) clearInterval(S.timer);
-  }, 1000);
-}
-
-function renderMission() {
-  const m = missions[S.missions];
-  view(`
-    <section class="panel mission-panel">
-      <div class="topbar">
-        <span class="tag">${m.icon} ${m.room}</span>
-        <span class="timer">${fmt(S.time)}</span>
-      </div>
-      <div class="progress"><div style="width:${(S.missions / missions.length) * 100}%"></div></div>
-      <div class="mission-title-wrap">
-        <span class="mission-kicker">Akte ${S.missions + 1}</span>
-        <h2>${m.title}</h2>
-      </div>
-      <p class="quote">${m.prompt}</p>
-      <div class="choices">
-        ${m.choices.map((choice, index) => `
-          <button class="choice" onclick="answer(${index})">${String.fromCharCode(65 + index)} · ${choice}</button>
-        `).join('')}
-      </div>
-    </section>
-  `);
-}
-
-function answer(i) {
-  clearInterval(S.timer);
-  const m = missions[S.missions];
-  const ok = i === m.correct;
-  S.answers.push({ index: S.missions, chosen: i, correct: m.correct, ok });
-  if (ok) S.score += 1;
-  saveState();
-
-  view(`
-    <section class="panel ${ok ? 'success' : 'danger'} result-panel">
-      <div class="eyebrow">Systemprüfung</div>
-      <h2>${ok ? 'Akte stabilisiert' : 'Fehlkopplung erkannt'}</h2>
-      <p>${m.explain}</p>
-      <button onclick="advance()">${S.missions < missions.length - 1 ? 'Nächste Akte' : 'Konferenz'}</button>
-    </section>
-  `);
-}
-
-function advance() {
-  S.missions += 1;
-  if (S.missions < missions.length) {
-    S.time = 240;
-    runTimer();
-    renderMission();
-  } else {
-    meeting();
-  }
-  saveState();
-}
-
-function meeting() {
-  S.time = 300;
-  runTimer();
-  view(`
-    <section class="panel conference-panel">
-      <div class="topbar">
-        <div>
-          <div class="eyebrow">Notfallkonferenz</div>
-          <h2>Wer manipulierte die Deutungen?</h2>
-        </div>
-        <span class="timer">${fmt(S.time)}</span>
-      </div>
-      <div class="grid votegrid">
-        ${S.names.map((n, i) => `
-          <button class="secondary" onclick="finish(${i})">${esc(n)}</button>
-        `).join('')}
-      </div>
-    </section>
-  `);
-}
-
-function finish(i) {
-  clearInterval(S.timer);
-  const agent = S.agentIndex;
-  const caught = i === agent;
-  const percentage = Math.round((S.score / missions.length) * 100);
-  updateStats({ caught, score: S.score, agentIndex: agent });
-
-  S.lastOutcome = {
-    caught,
-    agentName: S.names[agent],
-    score: S.score,
-    percentage,
-    date: new Date().toISOString()
-  };
-  saveState();
-
-  view(`
-    <section class="panel summary-panel">
-      <div class="eyebrow">Missionsprotokoll</div>
-      <h2>${caught ? 'Agent identifiziert' : 'Agent entkommen'}</h2>
-
-      <div class="summary-grid">
-        <div class="card summary-card agent-card">
-          <h3>Agent</h3>
-          <div class="agent-badge">${esc(S.names[agent])}</div>
-          <p>Rolle: <strong>Agent des Ressentiments</strong></p>
-        </div>
-        <div class="card summary-card">
-          <h3>Ergebnis</h3>
-          <div class="scoreline"><strong>${S.score}/${missions.length}</strong> <span>Punkte</span></div>
-          <div class="scoreline"><strong>${percentage}%</strong> <span>Treffer</span></div>
-          <div class="scoreline"><strong>${caught ? 'Ja' : 'Nein'}</strong> <span>Gefasst</span></div>
-        </div>
-      </div>
-
-      <div class="card exit-card">
-        <h3>Exit-Ticket</h3>
-        <ol>
-          <li>Erkläre „Genealogie“ in einem Satz.</li>
-          <li>Nenne eine Wertverschiebung.</li>
-          <li>Formuliere eine Kritik.</li>
-        </ol>
-      </div>
-      <button onclick="home()">Neue Mission</button>
-    </section>
-  `);
-}
-
-function updateStats({ caught, score, agentIndex }) {
-  const stats = S.stats;
-  stats.games += 1;
-  stats.success += score;
-  if (caught) stats.agentFound += 1;
-  else stats.agentEscaped += 1;
-  stats.history.unshift({
-    caught,
-    score,
-    agentName: S.names[agentIndex],
-    date: new Date().toLocaleDateString('de-DE')
-  });
-  stats.history = stats.history.slice(0, 6);
-  S.stats = stats;
-  saveStats();
-  return stats;
-}
-
-function teacher() {
-  const agent = S.agentIndex !== null ? S.agentIndex : null;
-  const currentAgentName = agent !== null && S.names[agent] ? S.names[agent] : 'Noch nicht ausgelost';
-
-  view(`
-    <section class="panel teacher-panel">
-      <div class="eyebrow">Lehrkraft-Modus</div>
-      <h2>Quick-Plan</h2>
-      <div class="teacher-grid">
-        <div class="card teacher-card danger-panel">
-          <h3>Geheimer Agent</h3>
-          <div class="bigrole bad">${esc(currentAgentName)}</div>
-          <p><strong>Nur für Lehrer sichtbar.</strong></p>
-        </div>
-        <div class="card teacher-card">
-          <h3>Agenda</h3>
-          <ol>
-            <li>Einführung</li>
-            <li>Rollen</li>
-            <li>4 Akten</li>
-            <li>Konferenz</li>
-            <li>Exit-Ticket</li>
-          </ol>
-        </div>
-      </div>
-      <div class="alert">Wichtiger Fokus: Genese ≠ Geltung. Nietzsches Diagnose ist kein Rollenlabel.</div>
-      <button onclick="home()">Zur Startseite</button>
-    </section>
-  `);
-}
-
-function fmt(s) {
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function esc(s) {
-  return String(s).replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[char]));
-}
-
-function readStats() {
-  try {
-    const raw = localStorage.getItem(STATS_KEY);
-    return raw ? JSON.parse(raw) : { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
-  } catch {
-    return { games: 0, success: 0, agentFound: 0, agentEscaped: 0, history: [] };
-  }
-}
-
-readState();
-home();
